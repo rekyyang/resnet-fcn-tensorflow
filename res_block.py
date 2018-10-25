@@ -117,8 +117,18 @@ class ResFcn:
 			result = tf.add(conv3, conv1)
 			return result
 
+	# def res_block_3(self, img, out_channels, down=True):
+	# 	with tf.variable_scope("res_" + str(img.shape[3]) + str("down" if down else "up")):
+	# 		res1 = self.res_block_base(img, img.shape[3], "res_block1")
+	# 		res2 = self.res_block_base(res1, res1.shape[3], "res_block2")
+	# 		if down:
+	# 			res3 = self.res_block_bottleneck_down(res2, out_channels, "res_block3")
+	# 		else:
+	# 			res3 = self.res_block_bottleneck_up(res2, out_channels, "res_block3")
+	# 		return res3
+
 	def res_block_3(self, img, out_channels, down=True):
-		with tf.variable_scope("res_" + str(img.shape[3]) + str("down" if down else "up")):
+		with tf.variable_scope("res_" + str(img.shape[3]) + 'to' + str(out_channels) + str("down" if down else "up")):
 			res1 = self.res_block_base(img, img.shape[3], "res_block1")
 			res2 = self.res_block_base(res1, res1.shape[3], "res_block2")
 			if down:
@@ -136,15 +146,15 @@ class ResFcn:
 		res_blk_128 = self.res_block_3(res_blk_64, 256)
 
 		res_blk_256 = self.res_block_3(res_blk_128, 512)
-		#
+		# ------------------------------------------------------------------------------------------------------------ #
 		res_blk_512_ = self.res_block_3(res_blk_256, 256, False)
 		# res_blk_512_ = res_blk_128
 
-		res_blk_256_ = self.res_block_3(res_blk_512_, 128, False)
+		res_blk_256_ = self.res_block_3(tf.concat([res_blk_512_, res_blk_128], 3), 128, False)
 
-		res_blk_128_ = self.res_block_3(res_blk_256_, 64, False)
+		res_blk_128_ = self.res_block_3(tf.concat([res_blk_256_, res_blk_64], 3), 64, False)
 
-		res_blk_64_ = self.res_block_3(res_blk_128_, 1, False)
+		res_blk_64_ = self.res_block_3(tf.concat([res_blk_128_, img_], 3), 1, False)
 
 		result = res_blk_64_
 
@@ -179,13 +189,13 @@ class ResFcn:
 					sess.run(self.train_op, feed_dict={self.input_img_batch: img,
 													   self.labels: label})
 
-					img_ = cv2.imread('./dataset/test/(22).jpg', 1)
-					img_ = cv2.resize(img_, (512, 512))
-					img_ = np.array(img_)[np.newaxis, :, :, :]
-					feed_dict = {self.input_img_batch: img_}
-					result = sess.run(self.seg, feed_dict=feed_dict)
-					plt.imshow(np.array(result[0, :, :, 0]))
-					plt.show()
+					# img_ = cv2.imread('./dataset/test/(22).jpg', 1)
+					# img_ = cv2.resize(img_, (512, 512))
+					# img_ = np.array(img_)[np.newaxis, :, :, :]
+					# feed_dict = {self.input_img_batch: img_}
+					# result = sess.run(self.seg, feed_dict=feed_dict)
+					# plt.imshow(np.array(result[0, :, :, 0]))
+					# plt.show()
 
 					if ii >= 1000 and ii % 100 == 0:
 						self.saver.save(sess, MODEL_PATH)
@@ -206,7 +216,7 @@ class ResFcn:
 			self.saver = tf.train.import_meta_graph("./weight/model.meta")
 			self.saver.restore(sess, tf.train.latest_checkpoint("./weight"))
 			graph = tf.get_default_graph()
-			result_tensor = graph.get_tensor_by_name("res_64up/res_block3/Add:0")
+			result_tensor = graph.get_tensor_by_name("res_128to1up/res_block3/Add:0")
 			input_tensor = graph.get_tensor_by_name("image_input:0")
 			feed_dict = {input_tensor: img}
 			result = sess.run(result_tensor, feed_dict=feed_dict)
@@ -218,6 +228,6 @@ class ResFcn:
 
 if __name__ == "__main__":
 	res_fcn = ResFcn()
-	# res_fcn.predict('./dataset/features/(3).jpg')
-	res_fcn.train()
+	res_fcn.predict('./dataset/test/3.jpg')
+	# res_fcn.train()
 
